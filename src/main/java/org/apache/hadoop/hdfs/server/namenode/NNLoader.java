@@ -25,32 +25,15 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Field;
-import java.math.BigInteger;
 import java.net.InetAddress;
 import java.sql.SQLException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.LongStream;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.conf.Configuration;
@@ -62,11 +45,6 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.namenode.cache.SuggestionsEngine;
-import org.apache.hadoop.hdfs.server.namenode.queries.FileTypeHistogram;
-import org.apache.hadoop.hdfs.server.namenode.queries.Histograms;
-import org.apache.hadoop.hdfs.server.namenode.queries.MemorySizeHistogram;
-import org.apache.hadoop.hdfs.server.namenode.queries.SpaceSizeHistogram;
-import org.apache.hadoop.hdfs.server.namenode.queries.TimeHistogram;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Phase;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressView;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Step;
@@ -102,7 +80,6 @@ public class NNLoader {
   private Map<INode, INode> dirs = null;
   private TokenExtractor tokenExtractor = null;
 
-
   public NNLoader() {
     versionLoader = new VersionContext();
     suggestionsEngine = new SuggestionsEngine();
@@ -121,7 +98,9 @@ public class NNLoader {
     return suggestionsEngine;
   }
 
-  public QueryEngine getQueryEngine() { return qEngine; }
+  public QueryEngine getQueryEngine() {
+    return qEngine;
+  }
 
   public boolean isInit() {
     return inited.get();
@@ -253,7 +232,6 @@ public class NNLoader {
     long end = System.currentTimeMillis();
     LOG.info("Dumping the log response took {} ms.", (end - start));
   }
-
 
   public void saveNamespace() throws IOException {
     if (!isInit()) {
@@ -445,7 +423,6 @@ public class NNLoader {
     qEngine.setInited(false);
   }
 
-
   public void namesystemWriteLock(Boolean useLock) {
     if (useLock != null && useLock && namesystem != null) {
       namesystem.writeLock();
@@ -456,6 +433,32 @@ public class NNLoader {
     if (useLock != null && useLock && namesystem != null) {
       namesystem.writeUnlock();
     }
+  }
+
+  public Collection<INode> getINodeSet(String set) {
+    long start = System.currentTimeMillis();
+    Collection<INode> inodes;
+    switch (set) {
+      case "all":
+        inodes = all;
+        break;
+      case "files":
+        inodes = files.keySet();
+        break;
+      case "dirs":
+        inodes = dirs.keySet();
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "You did not specify a set to use. Please check /sets for available sets.");
+    }
+    long end = System.currentTimeMillis();
+    LOG.info(
+        "Fetching set of: {} had result size: {} and took: {} ms.",
+        set,
+        inodes.size(),
+        (end - start));
+    return inodes;
   }
 
   public void initReloadThreads(ExecutorService internalService, SecurityConfiguration conf) {

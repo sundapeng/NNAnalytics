@@ -25,7 +25,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.NNLoader;
-import org.apache.hadoop.hdfs.server.namenode.QueryEngine;
 import org.apache.hadoop.hdfs.server.namenode.queries.BaseQuery;
 import org.apache.hadoop.io.IOUtils;
 import org.codehaus.jackson.JsonFactory;
@@ -81,22 +80,20 @@ class NNAHelper {
   }
 
   static Collection<INode> performFilters(
-      QueryEngine qEngine, String set, String[] filters, String[] filterOps, String find) {
-    Collection<INode> interim = performFilters(qEngine, set, filters, filterOps);
-    return qEngine.findFilter(interim, find);
+      NNLoader nnLoader, String set, String[] filters, String[] filterOps, String find) {
+    Collection<INode> interim = performFilters(nnLoader, set, filters, filterOps);
+    return nnLoader.getQueryEngine().findFilter(interim, find);
   }
 
   static Collection<INode> performFilters(
-      QueryEngine qEngine, String set, String[] filters, String[] filterOps) {
-    Collection<INode> inodes = qEngine.getINodeSet(set);
+      NNLoader nnLoader, String set, String[] filters, String[] filterOps) {
+    Collection<INode> inodes = nnLoader.getINodeSet(set);
 
     if (filters == null || filters.length == 0 || filterOps == null || filterOps.length == 0) {
       return inodes;
     }
 
-    inodes = qEngine.combinedFilter(inodes, filters, filterOps);
-
-    return inodes;
+    return nnLoader.getQueryEngine().combinedFilter(inodes, filters, filterOps);
   }
 
   static void toJsonList(HttpServletResponse resp, Enum[]... values) throws IOException {

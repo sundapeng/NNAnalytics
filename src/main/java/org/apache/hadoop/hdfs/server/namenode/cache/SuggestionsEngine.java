@@ -133,18 +133,17 @@ public class SuggestionsEngine {
     long numFiles24h = files24h.size();
     long diskspace24h = qEngine.sum(files24h, "diskspaceConsumed");
     Map<String, Long> numFiles24hUsers = qEngine.byUserHistogramCpu(files24h, "count");
-    Map<String, Long> diskspace24hUsers =
-            qEngine.byUserHistogramCpu(files24h, "diskspaceConsumed");
+    Map<String, Long> diskspace24hUsers = qEngine.byUserHistogramCpu(files24h, "diskspaceConsumed");
     Map<String, Long> diskspaceUsers = qEngine.byUserHistogramCpu(files, "diskspaceConsumed");
 
     Collection<INode> oldFiles1yr =
-            qEngine.combinedFilter(
+        qEngine.combinedFilter(
             files, new String[] {"accessTime"}, new String[] {"olderThanYears:1"});
     Map<String, Long> oldFiles1yrCountUsers = qEngine.byUserHistogramCpu(oldFiles1yr, "count");
     Map<String, Long> oldFiles1yrDsUsers =
-            qEngine.byUserHistogramCpu(oldFiles1yr, "diskspaceConsumed");
+        qEngine.byUserHistogramCpu(oldFiles1yr, "diskspaceConsumed");
     Collection<INode> oldFiles2yr =
-            qEngine.combinedFilter(
+        qEngine.combinedFilter(
             files, new String[] {"accessTime"}, new String[] {"olderThanYears:2"});
     Map<String, Long> oldFiles2yrCountUsers = qEngine.byUserHistogramCpu(oldFiles2yr, "count");
     Map<String, Long> oldFiles2yrDsUsers =
@@ -251,14 +250,11 @@ public class SuggestionsEngine {
     Map<String, Long> emptyDirs1yrUsers = qEngine.byUserHistogramCpu(emptyDirs1yr, "count");
     Map<String, Long> tinyFiles1yrUsers = qEngine.byUserHistogramCpu(tinyFiles1yr, "count");
     Map<String, Long> smallFiles1yrUsers = qEngine.byUserHistogramCpu(smallFiles1yr, "count");
-    Map<String, Long> emptyFilesMemUsers =
-            qEngine.byUserHistogramCpu(emptyFiles, "memoryConsumed");
+    Map<String, Long> emptyFilesMemUsers = qEngine.byUserHistogramCpu(emptyFiles, "memoryConsumed");
     Map<String, Long> emptyDirsMemUsers = qEngine.byUserHistogramCpu(emptyDirs, "memoryConsumed");
     Map<String, Long> tinyFilesMemUsers = qEngine.byUserHistogramCpu(tinyFiles, "memoryConsumed");
-    Map<String, Long> smallFilesMemUsers =
-        qEngine.byUserHistogramCpu(smallFiles, "memoryConsumed");
-    Map<String, Long> tinyFilesDsUsers =
-        qEngine.byUserHistogramCpu(tinyFiles, "diskspaceConsumed");
+    Map<String, Long> smallFilesMemUsers = qEngine.byUserHistogramCpu(smallFiles, "memoryConsumed");
+    Map<String, Long> tinyFilesDsUsers = qEngine.byUserHistogramCpu(tinyFiles, "diskspaceConsumed");
     Map<String, Long> smallFilesDsUsers =
         qEngine.byUserHistogramCpu(smallFiles, "diskspaceConsumed");
     Map<String, Long> emptyFiles24hMemUsers =
@@ -313,7 +309,7 @@ public class SuggestionsEngine {
     dirDs24h = Histograms.sliceToTop(dirDs24h, 1000);
     for (String dir : cachedDirs) {
       Collection<INode> inodes =
-              qEngine.combinedFilter(
+          qEngine.combinedFilter(
               files24h, new String[] {"path"}, new String[] {"startsWith:" + dir});
       long count = inodes.size();
       long diskspaceConsumed = qEngine.sum(inodes, "diskspaceConsumed");

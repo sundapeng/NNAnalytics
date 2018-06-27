@@ -109,7 +109,7 @@ public class Transforms {
       Function<INode, Long> longFunction = qEngine.getFilterFunctionToLongForINode(condition[0]);
       if (longFunction != null) {
         Function<Long, Boolean> longCompFunction =
-                qEngine.getFilterFunctionForLong(Long.parseLong(condition[2]), condition[1]);
+            qEngine.getFilterFunctionForLong(Long.parseLong(condition[2]), condition[1]);
         Function<INode, Boolean> comparisonFunction = longCompFunction.compose(longFunction);
         comparisons.add(comparisonFunction);
         continue;

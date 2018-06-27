@@ -377,9 +377,9 @@ public class NNAnalyticsRestAPI {
           sb.append("Ready to service history: ").append(isHistorical).append("\n");
           sb.append("Ready to service suggestions: ").append(isProvidingSuggestions).append("\n\n");
           if (isInit) {
-            long allSetSize = qEngine.getINodeSet(NNAConstants.SET.all.name()).size();
-            long fileSetSize = qEngine.getINodeSet(NNAConstants.SET.files.name()).size();
-            long dirSetSize = qEngine.getINodeSet(NNAConstants.SET.dirs.name()).size();
+            long allSetSize = nnLoader.getINodeSet(NNAConstants.SET.all.name()).size();
+            long fileSetSize = nnLoader.getINodeSet(NNAConstants.SET.files.name()).size();
+            long dirSetSize = nnLoader.getINodeSet(NNAConstants.SET.dirs.name()).size();
             sb.append("Current TxID: ").append(nnLoader.getCurrentTxID()).append("\n");
             sb.append("INode GSet size: ").append(allSetSize).append("\n\n");
             sb.append("INodeFile set size: ").append(fileSetSize).append("\n");
@@ -626,7 +626,7 @@ public class NNAnalyticsRestAPI {
             return "Namesystem is not fully initialized.\n";
           }
           String path = req.queryMap("path").value();
-          qEngine.dumpINodeInDetail(path, res.raw());
+          nnLoader.dumpINodeInDetail(path, res.raw());
           return res;
         });
 
@@ -666,9 +666,9 @@ public class NNAnalyticsRestAPI {
             QueryChecker.isValidQuery(set2, filters2, null, sum2, filterOps2, null);
 
             Collection<INode> inodes1 =
-                NNAHelper.performFilters(qEngine, set1, filters1, filterOps1);
+                NNAHelper.performFilters(nnLoader, set1, filters1, filterOps1);
             Collection<INode> inodes2 =
-                NNAHelper.performFilters(qEngine, set2, filters2, filterOps2);
+                NNAHelper.performFilters(nnLoader, set2, filters2, filterOps2);
 
             if (!sum1.isEmpty() && !sum2.isEmpty()) {
               long sumValue1 = qEngine.sum(inodes1, sum1);
@@ -745,7 +745,7 @@ public class NNAnalyticsRestAPI {
             }
 
             Collection<INode> inodes =
-                NNAHelper.performFilters(qEngine, set, filters, filterOps, find);
+                NNAHelper.performFilters(nnLoader, set, filters, filterOps, find);
 
             if (sums.length == 1 && sumStr != null) {
               String sum = sums[0];
@@ -841,7 +841,7 @@ public class NNAnalyticsRestAPI {
             String find = req.queryMap("find").value();
 
             QueryChecker.isValidQuery(set, filters, type, sum, filterOps, find);
-            Collection<INode> inodes = NNAHelper.performFilters(qEngine, set, filters, filterOps);
+            Collection<INode> inodes = NNAHelper.performFilters(nnLoader, set, filters, filterOps);
 
             NNAConstants.HISTOGRAM htEnum = NNAConstants.HISTOGRAM.valueOf(histType);
             Map<String, Function<INode, Long>> transformMap =
@@ -1032,7 +1032,7 @@ public class NNAnalyticsRestAPI {
             for (String find : finds) {
               QueryChecker.isValidQuery(set, filters, type, null, filterOps, find);
             }
-            Collection<INode> inodes = NNAHelper.performFilters(qEngine, set, filters, filterOps);
+            Collection<INode> inodes = NNAHelper.performFilters(nnLoader, set, filters, filterOps);
 
             NNAConstants.HISTOGRAM htEnum = NNAConstants.HISTOGRAM.valueOf(histType);
             List<Map<String, Long>> histograms = new ArrayList<>(sums.length + finds.length);
@@ -1188,7 +1188,7 @@ public class NNAnalyticsRestAPI {
             QueryChecker.isValidQuery(set, filters, null, null, filterOps, find);
 
             Collection<INode> inodes =
-                NNAHelper.performFilters(qEngine, set, filters, filterOps, find);
+                NNAHelper.performFilters(nnLoader, set, filters, filterOps, find);
             if (inodes.size() == 0) {
               LOG.info("Skipping operation request because it resulted in empty INode set.");
               throw new IOException(
