@@ -63,6 +63,7 @@ import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeWithAdditionalFields;
 import org.apache.hadoop.hdfs.server.namenode.NNAConstants;
 import org.apache.hadoop.hdfs.server.namenode.NNLoader;
+import org.apache.hadoop.hdfs.server.namenode.QueryEngine;
 import org.apache.hadoop.hdfs.server.namenode.TransferFsImageWrapper;
 import org.apache.hadoop.hdfs.server.namenode.operations.BaseOperation;
 import org.apache.hadoop.hdfs.server.namenode.operations.Delete;
@@ -124,6 +125,7 @@ public class NNAnalyticsRestAPI {
   public static final Logger LOG = LoggerFactory.getLogger(NNAnalyticsRestAPI.class.getName());
 
   private static final NNLoader nnLoader = new NNLoader();
+  private static final QueryEngine qEngine = new QueryEngine();
   private static final HSQLDriver hsqlDriver = new HSQLDriver();
   private static final TransferFsImageWrapper transferFsImage =
       new TransferFsImageWrapper(nnLoader);
@@ -375,9 +377,9 @@ public class NNAnalyticsRestAPI {
           sb.append("Ready to service history: ").append(isHistorical).append("\n");
           sb.append("Ready to service suggestions: ").append(isProvidingSuggestions).append("\n\n");
           if (isInit) {
-            long allSetSize = nnLoader.getINodeSet(NNAConstants.SET.all.name()).size();
-            long fileSetSize = nnLoader.getINodeSet(NNAConstants.SET.files.name()).size();
-            long dirSetSize = nnLoader.getINodeSet(NNAConstants.SET.dirs.name()).size();
+            long allSetSize = qEngine.getINodeSet(NNAConstants.SET.all.name()).size();
+            long fileSetSize = qEngine.getINodeSet(NNAConstants.SET.files.name()).size();
+            long dirSetSize = qEngine.getINodeSet(NNAConstants.SET.dirs.name()).size();
             sb.append("Current TxID: ").append(nnLoader.getCurrentTxID()).append("\n");
             sb.append("INode GSet size: ").append(allSetSize).append("\n\n");
             sb.append("INodeFile set size: ").append(fileSetSize).append("\n");
@@ -624,7 +626,7 @@ public class NNAnalyticsRestAPI {
             return "Namesystem is not fully initialized.\n";
           }
           String path = req.queryMap("path").value();
-          nnLoader.dumpINodeInDetail(path, res.raw());
+          qEngine.dumpINodeInDetail(path, res.raw());
           return res;
         });
 
@@ -664,13 +666,13 @@ public class NNAnalyticsRestAPI {
             QueryChecker.isValidQuery(set2, filters2, null, sum2, filterOps2, null);
 
             Collection<INode> inodes1 =
-                NNAHelper.performFilters(nnLoader, set1, filters1, filterOps1);
+                NNAHelper.performFilters(qEngine, set1, filters1, filterOps1);
             Collection<INode> inodes2 =
-                NNAHelper.performFilters(nnLoader, set2, filters2, filterOps2);
+                NNAHelper.performFilters(qEngine, set2, filters2, filterOps2);
 
             if (!sum1.isEmpty() && !sum2.isEmpty()) {
-              long sumValue1 = nnLoader.sum(inodes1, sum1);
-              long sumValue2 = nnLoader.sum(inodes2, sum2);
+              long sumValue1 = qEngine.sum(inodes1, sum1);
+              long sumValue2 = qEngine.sum(inodes2, sum2);
               float division = (float) sumValue1 / (float) sumValue2;
 
               LOG.info("The result of {} dividied by {} is: {}", sumValue1, sumValue2, division);
@@ -743,11 +745,11 @@ public class NNAnalyticsRestAPI {
             }
 
             Collection<INode> inodes =
-                NNAHelper.performFilters(nnLoader, set, filters, filterOps, find);
+                NNAHelper.performFilters(qEngine, set, filters, filterOps, find);
 
             if (sums.length == 1 && sumStr != null) {
               String sum = sums[0];
-              long sumValue = nnLoader.sum(inodes, sum);
+              long sumValue = qEngine.sum(inodes, sum);
               String message = String.valueOf(sumValue);
               if (emailsTo != null
                   && emailsTo.length != 0
@@ -775,12 +777,12 @@ public class NNAnalyticsRestAPI {
             } else if (sums.length > 1 && sumStr != null) {
               StringBuilder message = new StringBuilder();
               for (String sum : sums) {
-                long sumValue = nnLoader.sum(inodes, sum);
+                long sumValue = qEngine.sum(inodes, sum);
                 message.append(sumValue).append("\n");
               }
               res.body(message.toString());
             } else {
-              nnLoader.dumpINodePaths(inodes, limit, res.raw());
+              qEngine.dumpINodePaths(inodes, limit, res.raw());
             }
 
             return res;
@@ -839,7 +841,7 @@ public class NNAnalyticsRestAPI {
             String find = req.queryMap("find").value();
 
             QueryChecker.isValidQuery(set, filters, type, sum, filterOps, find);
-            Collection<INode> inodes = NNAHelper.performFilters(nnLoader, set, filters, filterOps);
+            Collection<INode> inodes = NNAHelper.performFilters(qEngine, set, filters, filterOps);
 
             NNAConstants.HISTOGRAM htEnum = NNAConstants.HISTOGRAM.valueOf(histType);
             Map<String, Function<INode, Long>> transformMap =
@@ -853,51 +855,51 @@ public class NNAnalyticsRestAPI {
             try {
               switch (htEnum) {
                 case user:
-                  histogram = nnLoader.byUserHistogram(inodes, sum, find);
+                  histogram = qEngine.byUserHistogram(inodes, sum, find);
                   xAxis = "User Names";
                   break;
                 case group:
-                  histogram = nnLoader.byGroupHistogram(inodes, sum, find);
+                  histogram = qEngine.byGroupHistogram(inodes, sum, find);
                   xAxis = "Group Names";
                   break;
                 case accessTime:
-                  histogram = nnLoader.accessTimeHistogram(inodes, sum, find, timeRange);
+                  histogram = qEngine.accessTimeHistogram(inodes, sum, find, timeRange);
                   xAxis = "Last Accessed Time";
                   break;
                 case modTime:
-                  histogram = nnLoader.modTimeHistogram(inodes, sum, find, timeRange);
+                  histogram = qEngine.modTimeHistogram(inodes, sum, find, timeRange);
                   xAxis = "Last Modified Time";
                   break;
                 case fileSize:
-                  histogram = nnLoader.fileSizeHistogram(inodes, sum, find);
+                  histogram = qEngine.fileSizeHistogram(inodes, sum, find);
                   xAxis = "File Sizes (No Replication Factor)";
                   break;
                 case diskspaceConsumed:
-                  histogram = nnLoader.diskspaceConsumedHistogram(inodes, sum, find, transformMap);
+                  histogram = qEngine.diskspaceConsumedHistogram(inodes, sum, find, transformMap);
                   xAxis = "Diskspace Consumed (File Size * Replication Factor)";
                   break;
                 case fileReplica:
-                  histogram = nnLoader.fileReplicaHistogram(inodes, sum, find, transformMap);
+                  histogram = qEngine.fileReplicaHistogram(inodes, sum, find, transformMap);
                   xAxis = "File Replication Factor";
                   break;
                 case storageType:
-                  histogram = nnLoader.storageTypeHistogram(inodes, sum, find);
+                  histogram = qEngine.storageTypeHistogram(inodes, sum, find);
                   xAxis = "Storage Type Policy";
                   break;
                 case memoryConsumed:
-                  histogram = nnLoader.memoryConsumedHistogram(inodes, sum, find);
+                  histogram = qEngine.memoryConsumedHistogram(inodes, sum, find);
                   xAxis = "Memory Consumed";
                   break;
                 case parentDir:
-                  histogram = nnLoader.parentDirHistogram(inodes, parentDirDepth, sum, find);
+                  histogram = qEngine.parentDirHistogram(inodes, parentDirDepth, sum, find);
                   xAxis = "Directory Path";
                   break;
                 case fileType:
-                  histogram = nnLoader.fileTypeHistogram(inodes, sum, find);
+                  histogram = qEngine.fileTypeHistogram(inodes, sum, find);
                   xAxis = "File Type";
                   break;
                 case dirQuota:
-                  histogram = nnLoader.dirQuotaHistogram(inodes, sum);
+                  histogram = qEngine.dirQuotaHistogram(inodes, sum);
                   xAxis = "Directory Path";
                   break;
                 default:
@@ -912,7 +914,7 @@ public class NNAnalyticsRestAPI {
 
             // Perform conditions filtering.
             if (histogramConditionsStr != null && !histogramConditionsStr.isEmpty()) {
-              histogram = nnLoader.removeKeysOnConditional(histogram, histogramConditionsStr);
+              histogram = qEngine.removeKeysOnConditional(histogram, histogramConditionsStr);
             }
 
             // Slice top and bottom.
@@ -1030,7 +1032,7 @@ public class NNAnalyticsRestAPI {
             for (String find : finds) {
               QueryChecker.isValidQuery(set, filters, type, null, filterOps, find);
             }
-            Collection<INode> inodes = NNAHelper.performFilters(nnLoader, set, filters, filterOps);
+            Collection<INode> inodes = NNAHelper.performFilters(qEngine, set, filters, filterOps);
 
             NNAConstants.HISTOGRAM htEnum = NNAConstants.HISTOGRAM.valueOf(histType);
             List<Map<String, Long>> histograms = new ArrayList<>(sums.length + finds.length);
@@ -1052,37 +1054,37 @@ public class NNAnalyticsRestAPI {
               try {
                 switch (htEnum) {
                   case user:
-                    histogram = nnLoader.byUserHistogram(inodes, sum, find);
+                    histogram = qEngine.byUserHistogram(inodes, sum, find);
                     break;
                   case group:
-                    histogram = nnLoader.byGroupHistogram(inodes, sum, find);
+                    histogram = qEngine.byGroupHistogram(inodes, sum, find);
                     break;
                   case accessTime:
-                    histogram = nnLoader.accessTimeHistogram(inodes, sum, find, timeRange);
+                    histogram = qEngine.accessTimeHistogram(inodes, sum, find, timeRange);
                     break;
                   case modTime:
-                    histogram = nnLoader.modTimeHistogram(inodes, sum, find, timeRange);
+                    histogram = qEngine.modTimeHistogram(inodes, sum, find, timeRange);
                     break;
                   case fileSize:
-                    histogram = nnLoader.fileSizeHistogram(inodes, sum, find);
+                    histogram = qEngine.fileSizeHistogram(inodes, sum, find);
                     break;
                   case diskspaceConsumed:
-                    histogram = nnLoader.diskspaceConsumedHistogram(inodes, sum, find, null);
+                    histogram = qEngine.diskspaceConsumedHistogram(inodes, sum, find, null);
                     break;
                   case fileReplica:
-                    histogram = nnLoader.fileReplicaHistogram(inodes, sum, find, null);
+                    histogram = qEngine.fileReplicaHistogram(inodes, sum, find, null);
                     break;
                   case storageType:
-                    histogram = nnLoader.storageTypeHistogram(inodes, sum, find);
+                    histogram = qEngine.storageTypeHistogram(inodes, sum, find);
                     break;
                   case memoryConsumed:
-                    histogram = nnLoader.memoryConsumedHistogram(inodes, sum, find);
+                    histogram = qEngine.memoryConsumedHistogram(inodes, sum, find);
                     break;
                   case parentDir:
-                    histogram = nnLoader.parentDirHistogram(inodes, parentDirDepth, sum, find);
+                    histogram = qEngine.parentDirHistogram(inodes, parentDirDepth, sum, find);
                     break;
                   case fileType:
-                    histogram = nnLoader.fileTypeHistogram(inodes, sum, find);
+                    histogram = qEngine.fileTypeHistogram(inodes, sum, find);
                     break;
                   default:
                     throw new IllegalArgumentException(
@@ -1114,7 +1116,7 @@ public class NNAnalyticsRestAPI {
             // Perform conditions filtering.
             if (histogramConditionsStr != null && !histogramConditionsStr.isEmpty()) {
               mergedHistogram =
-                  nnLoader.removeKeysOnConditional2(mergedHistogram, histogramConditionsStr);
+                  qEngine.removeKeysOnConditional2(mergedHistogram, histogramConditionsStr);
             }
 
             // Sort results.
@@ -1186,7 +1188,7 @@ public class NNAnalyticsRestAPI {
             QueryChecker.isValidQuery(set, filters, null, null, filterOps, find);
 
             Collection<INode> inodes =
-                NNAHelper.performFilters(nnLoader, set, filters, filterOps, find);
+                NNAHelper.performFilters(qEngine, set, filters, filterOps, find);
             if (inodes.size() == 0) {
               LOG.info("Skipping operation request because it resulted in empty INode set.");
               throw new IOException(

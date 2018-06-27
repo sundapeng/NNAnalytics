@@ -198,10 +198,12 @@ public class VersionContext implements VersionInterface {
             .boxed()
             .collect(Collectors.toMap(distinctStorageKeys::get, k -> (long) k));
 
-    return nnLoader.binMappingHistogram(
+    QueryEngine qEngine = nnLoader.getQueryEngine();
+
+    return qEngine.binMappingHistogram(
         inodes,
         sum,
-        nnLoader.getSumFunctionForINode(sum),
+        qEngine.getSumFunctionForINode(sum),
         node -> (long) distinctStorageIds.indexOf((long) node.getStoragePolicyID()),
         storageIdToIndexToKeyMap);
   }
@@ -221,10 +223,12 @@ public class VersionContext implements VersionInterface {
     String findOp = finds[0];
     String findField = finds[1];
 
-    return nnLoader.binMappingHistogramWithFind(
+    QueryEngine qEngine = nnLoader.getQueryEngine();
+
+    return qEngine.binMappingHistogramWithFind(
         inodes,
         findOp,
-        nnLoader.getFilterFunctionToLongForINode(findField),
+        qEngine.getFilterFunctionToLongForINode(findField),
         node -> (long) distinctStorageIds.indexOf((long) node.getStoragePolicyID()),
         storageIdToIndexToKeyMap);
   }
