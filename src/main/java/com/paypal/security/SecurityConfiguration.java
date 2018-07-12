@@ -40,6 +40,7 @@ public class SecurityConfiguration {
   private static final String NNA_PORT_DEFAULT = "8080";
   private static final String NNA_HISTORICAL_DEFAULT = "false";
   private static final String LDAP_ENABLED_DEFAULT = "false";
+  private static final String OAUTH_ENABLED_DEFAULT = "false";
   private static final String AUTHORIZATION_ENABLED_DEFAULT = "false";
   private static final String LDAP_USE_STARTTLS_DEFAULT = "false";
   private static final String LDAP_CONNECT_TIMEOUT_DEFAULT = "1000";
@@ -121,6 +122,34 @@ public class SecurityConfiguration {
 
   public int getLdapConnectionPoolMaxSize() {
     return Integer.parseInt(properties.getProperty("ldap.connection.pool.max.size"));
+  }
+
+  public boolean getOAuthEnabled() {
+    return Boolean.parseBoolean(properties.getProperty("oauth.enable", OAUTH_ENABLED_DEFAULT));
+  }
+
+  public String getOAuthKey() {
+    return properties.getProperty("oauth.key");
+  }
+
+  public String getOAuthSecret() {
+    return properties.getProperty("oauth.secret");
+  }
+
+  public String getOAuthAuthUrl() {
+    return properties.getProperty("oauth.auth.url");
+  }
+
+  public String getOAuthProfileUrl() {
+    return properties.getProperty("oauth.profile.url");
+  }
+
+  public String getOAuthTokenUrl() {
+    return properties.getProperty("oauth.token.url");
+  }
+
+  public String getOAuthScope() {
+    return properties.getProperty("oauth.scope");
   }
 
   public int getSuggestionsReloadSleepMs() {

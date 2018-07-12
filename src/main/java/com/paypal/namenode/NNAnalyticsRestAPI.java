@@ -100,6 +100,8 @@ import org.ldaptive.pool.PooledConnectionFactory;
 import org.ldaptive.pool.SearchValidator;
 import org.ldaptive.ssl.KeyStoreCredentialConfig;
 import org.ldaptive.ssl.SslConfig;
+import org.pac4j.core.client.Clients;
+import org.pac4j.core.config.Config;
 import org.pac4j.core.exception.BadCredentialsException;
 import org.pac4j.core.profile.CommonProfile;
 import org.pac4j.jwt.config.encryption.EncryptionConfiguration;
@@ -109,6 +111,7 @@ import org.pac4j.jwt.config.signature.SignatureConfiguration;
 import org.pac4j.jwt.credentials.authenticator.JwtAuthenticator;
 import org.pac4j.jwt.profile.JwtGenerator;
 import org.pac4j.ldap.credentials.authenticator.LdapAuthenticator;
+import org.pac4j.oauth.client.GenericOAuth20Client;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Spark;
@@ -202,9 +205,16 @@ public class NNAnalyticsRestAPI {
     }
 
     boolean ldapEnabled = conf.getLdapEnabled();
+    boolean oauthEnabled = conf.getOAuthEnabled();
+    if (ldapEnabled && oauthEnabled) {
+      throw new IllegalStateException(
+          "Illegal authentication configuration. Please only enable one authentication method.");
+    }
+
     Spark.port(conf.getPort());
+
     if (ldapEnabled) {
-      LOG.info("Enabled web security.");
+      LOG.info("Enabling web security: LDAP");
       // jwt:
       SignatureConfiguration sigConf =
           new SecretSignatureConfiguration(conf.getJwtSignatureSecret());
@@ -252,14 +262,42 @@ public class NNAnalyticsRestAPI {
       LdapAuthenticator ldapAuth = new LdapAuthenticator();
       ldapAuth.setLdapAuthenticator(ldaptiveAuthenticator);
 
-      secContext.init(conf, jwtAuthenticator, jwtGenerator, ldapAuth);
+      secContext.initLdap(conf, jwtAuthenticator, jwtGenerator, ldapAuth);
+    } else if (oauthEnabled) {
+      LOG.info("Enabling web security: OAUTH");
+      // jwt:
+      SignatureConfiguration sigConf =
+          new SecretSignatureConfiguration(conf.getJwtSignatureSecret());
+      EncryptionConfiguration encConf =
+          new SecretEncryptionConfiguration(
+              conf.getJwtEncryptionSecret(), JWEAlgorithm.DIR, EncryptionMethod.A128GCM);
+      JwtGenerator<CommonProfile> jwtGenerator = new JwtGenerator<>(sigConf, encConf);
+      JwtAuthenticator jwtAuthenticator = new JwtAuthenticator(sigConf, encConf);
+
+      // oauth:
+      GenericOAuth20Client oauth = new GenericOAuth20Client();
+      oauth.setName("oauth");
+      oauth.setKey(conf.getOAuthKey());
+      oauth.setSecret(conf.getOAuthSecret());
+      oauth.setAuthUrl(conf.getOAuthAuthUrl());
+      oauth.setProfileUrl(conf.getOAuthProfileUrl());
+      oauth.setTokenUrl(conf.getOAuthTokenUrl());
+      oauth.setScope(conf.getOAuthScope());
+
+      final Clients clients = new Clients("http://localhost:8080/callback", oauth);
+      final Config config = new Config(clients);
+
+      secContext.initOAuth(conf, jwtAuthenticator, jwtGenerator, config);
     } else {
-      secContext.init(conf, null, null, null);
-      LOG.info("Disabled web security.");
+      LOG.info("Disabling web security.");
+      secContext.initNoAuth(conf);
     }
 
     /* This is the call to load everything under ./resources/public as HTML resources. */
     Spark.staticFileLocation("/public");
+
+    /* CALLBACK is used by indirect authentication clients as part of pac4j */
+    get("/callback", secContext.getCallback());
 
     /* ENDPOINTS endpoint is meant to showcase all available REST API endpoints in JSON list form. */
     get(

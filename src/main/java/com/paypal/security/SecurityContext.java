@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.server.namenode.NNAConstants;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.ldaptive.auth.FormatDnResolver;
+import org.pac4j.core.config.Config;
 import org.pac4j.core.credentials.UsernamePasswordCredentials;
 import org.pac4j.core.exception.HttpAction;
 import org.pac4j.core.profile.CommonProfile;
@@ -33,11 +34,14 @@ import org.pac4j.core.profile.ProfileManager;
 import org.pac4j.jwt.credentials.authenticator.JwtAuthenticator;
 import org.pac4j.jwt.profile.JwtGenerator;
 import org.pac4j.ldap.credentials.authenticator.LdapAuthenticator;
+import org.pac4j.sparkjava.CallbackRoute;
+import org.pac4j.sparkjava.SecurityFilter;
 import org.pac4j.sparkjava.SparkWebContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
+import spark.Route;
 
 public class SecurityContext {
 
@@ -47,6 +51,7 @@ public class SecurityContext {
   private JwtAuthenticator jwtAuthenticator;
   private JwtGenerator<CommonProfile> jwtGenerator;
   private LdapAuthenticator ldapAuthenticator;
+  private Config oauthConfig;
 
   private UserSet adminUsers;
   private UserSet writeUsers;
@@ -68,7 +73,19 @@ public class SecurityContext {
 
   public SecurityContext() {}
 
-  public void init(
+  public void initNoAuth(SecurityConfiguration secConf) {
+    this.securityConfiguration = secConf;
+
+    this.adminUsers = new UserSet(secConf.getAdminUsers());
+    this.writeUsers = new UserSet(secConf.getWriteUsers());
+    this.readOnlyUsers = new UserSet(secConf.getReadOnlyUsers());
+    this.cacheReaderUsers = new UserSet(secConf.getCacheReaderUsers());
+    this.localOnlyUsers = new UserPasswordSet(secConf.getLocalOnlyUsers());
+
+    this.init = true;
+  }
+
+  public void initLdap(
       SecurityConfiguration secConf,
       JwtAuthenticator jwtAuth,
       JwtGenerator<CommonProfile> jwtGen,
@@ -87,6 +104,25 @@ public class SecurityContext {
     this.init = true;
   }
 
+  public void initOAuth(
+      SecurityConfiguration secConf,
+      JwtAuthenticator jwtAuth,
+      JwtGenerator<CommonProfile> jwtGen,
+      Config oauthConfig) {
+    this.securityConfiguration = secConf;
+    this.jwtAuthenticator = jwtAuth;
+    this.jwtGenerator = jwtGen;
+    this.oauthConfig = oauthConfig;
+
+    this.adminUsers = new UserSet(secConf.getAdminUsers());
+    this.writeUsers = new UserSet(secConf.getWriteUsers());
+    this.readOnlyUsers = new UserSet(secConf.getReadOnlyUsers());
+    this.cacheReaderUsers = new UserSet(secConf.getCacheReaderUsers());
+    this.localOnlyUsers = new UserPasswordSet(secConf.getLocalOnlyUsers());
+
+    this.init = true;
+  }
+
   public synchronized void refresh(SecurityConfiguration secConf) {
     this.adminUsers = new UserSet(secConf.getAdminUsers());
     this.writeUsers = new UserSet(secConf.getWriteUsers());
@@ -95,10 +131,18 @@ public class SecurityContext {
     this.localOnlyUsers = new UserPasswordSet(secConf.getLocalOnlyUsers());
   }
 
+  public Route getCallback() {
+    if (securityConfiguration.getOAuthEnabled() && oauthConfig != null && init) {
+      return new CallbackRoute(oauthConfig);
+    }
+    return null;
+  }
+
   public void handleAuthentication(Request req, Response res)
       throws AuthenticationException, HttpAction {
-    boolean authenticationEnabled = securityConfiguration.getLdapEnabled();
-    if (!authenticationEnabled) {
+    boolean ldapEnabled = securityConfiguration.getLdapEnabled();
+    boolean oauthEnabled = securityConfiguration.getOAuthEnabled();
+    if (!ldapEnabled && !oauthEnabled) {
       String reqUsername = req.queryParams("proxy");
       if (reqUsername != null && !reqUsername.isEmpty()) {
         currentUser.set(reqUsername);
@@ -158,20 +202,32 @@ public class SecurityContext {
         }
       }
 
-      for (String ldapBaseDn : ldapBaseDns) {
-        String ldapDnRegexd = ldapBaseDn.replaceAll("%u", user);
-        ldapAuthenticator.getLdapAuthenticator().setDnResolver(new FormatDnResolver(ldapDnRegexd));
-        credentials = new UsernamePasswordCredentials(user, password, req.ip());
+      if (ldapEnabled) {
+        for (String ldapBaseDn : ldapBaseDns) {
+          String ldapDnRegexd = ldapBaseDn.replaceAll("%u", user);
+          ldapAuthenticator
+              .getLdapAuthenticator()
+              .setDnResolver(new FormatDnResolver(ldapDnRegexd));
+          credentials = new UsernamePasswordCredentials(user, password, req.ip());
 
+          try {
+            ldapAuthenticator.validate(credentials, new SparkWebContext(req, res));
+          } catch (RuntimeException e) {
+            authFailedEx = e;
+            continue;
+          }
+
+          authFailedEx = null;
+          break;
+        }
+      }
+
+      if (oauthEnabled) {
         try {
-          ldapAuthenticator.validate(credentials, new SparkWebContext(req, res));
+          new SecurityFilter(oauthConfig, "oauth").handle(req, res);
         } catch (RuntimeException e) {
           authFailedEx = e;
-          continue;
         }
-
-        authFailedEx = null;
-        break;
       }
 
       if (authFailedEx != null) {
