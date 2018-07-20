@@ -100,10 +100,13 @@ import org.ldaptive.pool.PooledConnectionFactory;
 import org.ldaptive.pool.SearchValidator;
 import org.ldaptive.ssl.KeyStoreCredentialConfig;
 import org.ldaptive.ssl.SslConfig;
-import org.pac4j.core.client.Clients;
+import org.pac4j.core.client.Client;
 import org.pac4j.core.config.Config;
 import org.pac4j.core.exception.BadCredentialsException;
+import org.pac4j.core.http.RelativeCallbackUrlResolver;
 import org.pac4j.core.profile.CommonProfile;
+import org.pac4j.http.client.direct.DirectBasicAuthClient;
+import org.pac4j.http.client.direct.ParameterClient;
 import org.pac4j.jwt.config.encryption.EncryptionConfiguration;
 import org.pac4j.jwt.config.encryption.SecretEncryptionConfiguration;
 import org.pac4j.jwt.config.signature.SecretSignatureConfiguration;
@@ -112,6 +115,8 @@ import org.pac4j.jwt.credentials.authenticator.JwtAuthenticator;
 import org.pac4j.jwt.profile.JwtGenerator;
 import org.pac4j.ldap.credentials.authenticator.LdapAuthenticator;
 import org.pac4j.oauth.client.GenericOAuth20Client;
+import org.pac4j.sparkjava.ApplicationLogoutRoute;
+import org.pac4j.sparkjava.CallbackRoute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Spark;
@@ -211,6 +216,9 @@ public class NNAnalyticsRestAPI {
           "Illegal authentication configuration. Please only enable one authentication method.");
     }
 
+    List<Client> clients = new ArrayList<>();
+    Config config;
+
     Spark.port(conf.getPort());
 
     if (ldapEnabled) {
@@ -223,6 +231,7 @@ public class NNAnalyticsRestAPI {
               conf.getJwtEncryptionSecret(), JWEAlgorithm.DIR, EncryptionMethod.A128GCM);
       JwtGenerator<CommonProfile> jwtGenerator = new JwtGenerator<>(sigConf, encConf);
       JwtAuthenticator jwtAuthenticator = new JwtAuthenticator(sigConf, encConf);
+      clients.add(new ParameterClient("nna-jwt-token", jwtAuthenticator));
 
       // ldaptive:
       ConnectionConfig connectionConfig = new ConnectionConfig();
@@ -261,7 +270,9 @@ public class NNAnalyticsRestAPI {
       // pac4j:
       LdapAuthenticator ldapAuth = new LdapAuthenticator();
       ldapAuth.setLdapAuthenticator(ldaptiveAuthenticator);
+      clients.add(new DirectBasicAuthClient(ldapAuth));
 
+      config = new Config(clients);
       secContext.initLdap(conf, jwtAuthenticator, jwtGenerator, ldapAuth);
     } else if (oauthEnabled) {
       LOG.info("Enabling web security: OAUTH");
@@ -273,6 +284,7 @@ public class NNAnalyticsRestAPI {
               conf.getJwtEncryptionSecret(), JWEAlgorithm.DIR, EncryptionMethod.A128GCM);
       JwtGenerator<CommonProfile> jwtGenerator = new JwtGenerator<>(sigConf, encConf);
       JwtAuthenticator jwtAuthenticator = new JwtAuthenticator(sigConf, encConf);
+      clients.add(new ParameterClient("nna-jwt-token", jwtAuthenticator));
 
       // oauth:
       GenericOAuth20Client oauth = new GenericOAuth20Client();
@@ -283,13 +295,14 @@ public class NNAnalyticsRestAPI {
       oauth.setProfileUrl(conf.getOAuthProfileUrl());
       oauth.setTokenUrl(conf.getOAuthTokenUrl());
       oauth.setScope(conf.getOAuthScope());
+      oauth.setCallbackUrlResolver(new RelativeCallbackUrlResolver());
+      oauth.setCallbackUrl("./callback");
 
-      final Clients clients = new Clients("http://localhost:8080/callback", oauth);
-      final Config config = new Config(clients);
-
+      config = new Config(clients);
       secContext.initOAuth(conf, jwtAuthenticator, jwtGenerator, config);
     } else {
       LOG.info("Disabling web security.");
+      config = new Config();
       secContext.initNoAuth(conf);
     }
 
@@ -297,7 +310,10 @@ public class NNAnalyticsRestAPI {
     Spark.staticFileLocation("/public");
 
     /* CALLBACK is used by indirect authentication clients as part of pac4j */
-    get("/callback", secContext.getCallback());
+    get("/callback", new CallbackRoute(config));
+
+    /* LOGOUT is used to log out of web sessions as part of pac4j */
+    get("/logout", new ApplicationLogoutRoute(config));
 
     /* ENDPOINTS endpoint is meant to showcase all available REST API endpoints in JSON list form. */
     get(

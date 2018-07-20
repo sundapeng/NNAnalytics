@@ -34,14 +34,12 @@ import org.pac4j.core.profile.ProfileManager;
 import org.pac4j.jwt.credentials.authenticator.JwtAuthenticator;
 import org.pac4j.jwt.profile.JwtGenerator;
 import org.pac4j.ldap.credentials.authenticator.LdapAuthenticator;
-import org.pac4j.sparkjava.CallbackRoute;
 import org.pac4j.sparkjava.SecurityFilter;
 import org.pac4j.sparkjava.SparkWebContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
-import spark.Route;
 
 public class SecurityContext {
 
@@ -129,13 +127,6 @@ public class SecurityContext {
     this.readOnlyUsers = new UserSet(secConf.getReadOnlyUsers());
     this.cacheReaderUsers = new UserSet(secConf.getCacheReaderUsers());
     this.localOnlyUsers = new UserPasswordSet(secConf.getLocalOnlyUsers());
-  }
-
-  public Route getCallback() {
-    if (securityConfiguration.getOAuthEnabled() && oauthConfig != null && init) {
-      return new CallbackRoute(oauthConfig);
-    }
-    return null;
   }
 
   public void handleAuthentication(Request req, Response res)
