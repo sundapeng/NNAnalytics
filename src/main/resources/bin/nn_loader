@@ -20,13 +20,13 @@
 #!/bin/bash
 
 export WORKING_DIR=/usr/local/nn-analytics
-export JAVA_HOME=/usr/java/latest
+export JAVA_HOME=/usr/lib/jvm/java
 export JAVA_CLASSPATH=${WORKING_DIR}/config:${WORKING_DIR}/lib/*
 
 nohup \
-${JAVA_HOME}/bin/java -server -XX:ParallelGCThreads=8 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:NewSize=25600m -XX:MaxNewSize=25600m \
+${JAVA_HOME}/bin/java -server -XX:ParallelGCThreads=8 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:NewSize=2560m -XX:MaxNewSize=2560m \
 -XX:PermSize=128m -XX:MaxPermSize=256m -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps \
--XX:CMSInitiatingOccupancyFraction=70 -XX:+UseCMSInitiatingOccupancyOnly -Xms244800m -Xmx244800m \
+-XX:CMSInitiatingOccupancyFraction=70 -XX:+UseCMSInitiatingOccupancyOnly -Xms24480m -Xmx24480m \
 -XX:+PrintFlagsFinal -XX:+PrintReferenceGC -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps \
 -Xloggc:/var/log/nn-analytics/gc.log-`date +'%Y%m%d%H%M'` \
 -Dhadoop.log.dir=/var/log/nn-analytics -Dhadoop.log.file=nn-analytics.log -Dhadoop.root.logger=INFO,DRFA \
